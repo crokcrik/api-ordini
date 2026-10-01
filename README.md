@@ -13,8 +13,7 @@ API REST in Node.js + Express per la gestione di ordini e-commerce.
 npm install
 node server.js
 
-## Avvio con Docker
-docker build -t api-ordini .
-docker run -p 3000:3000 api-ordini
+   ## Avvio con Docker
+   docker compose up -d --build
 
-Il server parte su http://localhost:3000
+   L'API è disponibile su http://localhost:3000
