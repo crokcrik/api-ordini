@@ -1,0 +1,27 @@
+### Tutti gli ordini
+GET http://localhost:3000/ordini
+
+//crea un ordine
+### Crea un ordine
+POST http://localhost:3000/ordini
+Content-Type: application/json
+
+{
+    "cliente": "Luca",
+    "totale": 60
+}
+
+###
+POST  http://localhost:3000/ordini
+Content-Type: application/json 
+
+{
+    "cliente": "Luca",
+    "totale" : "ciao"
+}
+
+###
+DELETE http://localhost:3000/ordini/2
+
+###
+DELETE http://localhost:3000/ordini/99
