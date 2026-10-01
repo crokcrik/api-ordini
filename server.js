@@ -1,104 +1,118 @@
-const express = require("express");  //importa Express
-const app = express();               //crea l'applicazione
-app.use(express.json());
+const express = require("express");
+const pool = require("./db");
 
+const app = express();
+app.use(express.json());
 const PORT = 3000;
 
-//una "rotta": quando qualcuno visita /. rispondi cosi
-/*
-app.get("/", (req, res) =>{
-    res.send("Ciao il server funziona!");
-});
-*/
-/*
-//prodotti/5 -> req.params.id vale "5" (ATTENZIONE: è una stringa)
-app.get("/prodotti/:id", (req, res) => {
-    const id = Number(req.params.id);  //conversione in numero
-    res.json({idRicevuto: id});
+// GET / → messaggio di benvenuto
+app.get("/", (req, res) => {
+  res.send("API Ordini v2 🐳");
 });
 
-// /prodotti?categoria=poster -> req.query.categoria vale "poster"
-app.get("/prodotti", (req, res) =>{
-    res.json({filtro: req.query.categoria});
+// GET /ordini → tutti gli ordini (filtro opzionale ?pagato=true/false)
+app.get("/ordini", async (req, res) => {
+  try {
+    const { pagato } = req.query;
+    let result;
+
+    if (pagato === "true" || pagato === "false") {
+      result = await pool.query(
+        "SELECT * FROM ordini WHERE pagato = $1 ORDER BY id",
+        [pagato === "true"]
+      );
+    } else {
+      result = await pool.query("SELECT * FROM ordini ORDER BY id");
+    }
+
+    res.json(result.rows);
+  } catch (e) {
+    console.log(e);
+    res.status(500).json({ errore: "Errore del database" });
+  }
 });
 
-*/
-
-let ordini = [
-    {id: 1, cliente: "Ana", totale: 45, pagato: true},
-    { id: 2, cliente: "João", totale: 120, pagato: false },
-    { id: 3, cliente: "Marco", totale: 80, pagato: true },
-    { id: 4, cliente: "Sofia", totale: 15, pagato: true },
-]
-/*
-app.get("/ordini", (req, res) =>{
-    res.json(ordini);
-});
-*/
-app.get("/ordini/:id", (req, res) => {
+// GET /ordini/:id → un solo ordine
+app.get("/ordini/:id", async (req, res) => {
+  try {
     const id = Number(req.params.id);
-    const ordine = ordini.find(o => o.id === id); 
-    if(!ordine){
-        return res.status(404).json({errore: "Ordine non trovato"});
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ errore: "Id non valido" });
     }
+
+    const result = await pool.query("SELECT * FROM ordini WHERE id = $1", [id]);
+    const ordine = result.rows[0];
+
+    if (!ordine) {
+      return res.status(404).json({ errore: "Ordine non trovato" });
+    }
+
     res.json(ordine);
-    
+  } catch (e) {
+    console.log(e);
+    res.status(500).json({ errore: "Errore del database" });
+  }
 });
 
-app.get("/fatturato", (req, res) => {
-    const fatturato = ordini.reduce((acc, o) => acc + o.totale, 0);
-    res.json({fatturato});
-})
-
-app.get("/ordini", (req, res) =>{
-    if(req.query.pagato === "true"){
-        const pagati =ordini.filter(o => o.pagato);
-        return res.json(pagati);
-    }else if(req.query.pagato === "false"){
-        const nonPagati = ordini.filter(o => !o.pagato);
-        return res.json(nonPagati);
-    }else{
-        res.json(ordini);
-    }
+// GET /fatturato → somma dei totali
+app.get("/fatturato", async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT COALESCE(SUM(totale), 0) AS fatturato FROM ordini"
+    );
+    res.json({ fatturato: Number(result.rows[0].fatturato) });
+  } catch (e) {
+    console.log(e);
+    res.status(500).json({ errore: "Errore del database" });
+  }
 });
 
-app.get("/",(req, res) =>{
-    res.send("API ordini v2");
-});
+// POST /ordini → crea un nuovo ordine
+app.post("/ordini", async (req, res) => {
+  try {
+    const { cliente, totale } = req.body;
 
-app.post("/ordini", (req, res) =>{
-    const cliente = req.body.cliente;
-    const totale = req.body.totale;
-
-    if(!cliente || typeof totale !== "number" || totale <= 0){
-        return res.status(400).json({errore: "Dati non validi"});
+    if (!cliente || typeof totale !== "number" || totale <= 0) {
+      return res.status(400).json({ errore: "Dati non validi" });
     }
 
-    const nuovoOrdine ={
-        id: ordini.length + 1,
-        cliente,
-        totale,
-        pagato: false
-    };
+    const result = await pool.query(
+      "INSERT INTO ordini (cliente, totale) VALUES ($1, $2) RETURNING *",
+      [cliente, totale]
+    );
 
-    ordini.push(nuovoOrdine);
-    res.status(201).json(nuovoOrdine);
+    res.status(201).json(result.rows[0]);
+  } catch (e) {
+    console.log(e);
+    res.status(500).json({ errore: "Errore del database" });
+  }
 });
 
-app.delete("/ordini/:id", (req, res) =>{
-    const identificativo = Number(req.params.id);
-    const ordine = ordini.find(o => o.id === identificativo);
-    if(!ordine){
-        return res.status(404).json({errore: "Ordine non trovato"});
+// DELETE /ordini/:id → elimina un ordine
+app.delete("/ordini/:id", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ errore: "Id non valido" });
     }
 
-    ordini = ordini.filter(o => o.id !== identificativo);
+    const result = await pool.query(
+      "DELETE FROM ordini WHERE id = $1 RETURNING *",
+      [id]
+    );
 
-    res.json({messaggio: "Ordine eliminato"})
+    if (result.rows.length === 0) {
+      return res.status(404).json({ errore: "Ordine non trovato" });
+    }
+
+    res.json({ messaggio: "Ordine eliminato", ordine: result.rows[0] });
+  } catch (e) {
+    console.log(e);
+    res.status(500).json({ errore: "Errore del database" });
+  }
 });
 
-//avvia il server
+// Avvio del server
 app.listen(PORT, () => {
-    console.log(`server attivo su http://localhost:${PORT}`)
+  console.log(`Server attivo su http://localhost:${PORT}`);
 });
-
