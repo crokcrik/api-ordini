@@ -62,6 +62,10 @@ app.get("/ordini", (req, res) =>{
     }
 });
 
+app.get("/",(req, res) =>{
+    res.send("API ordini v1");
+});
+
 app.post("/ordini", (req, res) =>{
     const cliente = req.body.cliente;
     const totale = req.body.totale;
