@@ -63,7 +63,7 @@ app.get("/ordini", (req, res) =>{
 });
 
 app.get("/",(req, res) =>{
-    res.send("API ordini v1");
+    res.send("API ordini v2");
 });
 
 app.post("/ordini", (req, res) =>{
